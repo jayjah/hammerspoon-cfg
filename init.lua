@@ -1,11 +1,8 @@
 -- lock screen shortcut
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'L', function() hs.caffeinate.startScreensaver() end)
 
--- quick jump to important applications
 hs.grid.setMargins({0, 0})
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'J', function () hs.application.launchOrFocus("Intellij IDEA Community Edition") end)
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'C', function () hs.application.launchOrFocus("Google Chrome") end)
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'F', function () hs.application.launchOrFocus("Ferdi") end)
+-- quick jump to important applications
 -- even though the app is named iTerm2, iterm is the correct name
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'T', function () hs.application.launchOrFocus("iTerm") end)
 
@@ -27,6 +24,16 @@ function baseMove(x, y, w, h)
     end
 end
 
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Left', baseMove(0, 0, 0.5, 1))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Right', baseMove(0.5, 0, 0.5, 1))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Down', baseMove(0, 0.5, 1, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Up', baseMove(0, 0, 1, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '4', baseMove(0.5, 0, 0.5, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '5', baseMove(0, 0.5, 0.5, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '6', baseMove(0.5, 0.5, 0.5, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'M', hs.grid.maximizeWindow)
+
+-- move current active window to differenct display
 function moveWindowToDisplay(d)
   return function()
     local displays = hs.screen.allScreens()
@@ -35,17 +42,121 @@ function moveWindowToDisplay(d)
   end
 end
 
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Left', baseMove(0, 0, 0.5, 1))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Right', baseMove(0.5, 0, 0.5, 1))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Down', baseMove(0, 0.5, 1, 0.5))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'Up', baseMove(0, 0, 1, 0.5))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '3', baseMove(0, 0, 0.5, 0.5))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '4', baseMove(0.5, 0, 0.5, 0.5))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '5', baseMove(0, 0.5, 0.5, 0.5))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '6', baseMove(0.5, 0.5, 0.5, 0.5))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '1', moveWindowToDisplay(1))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '2', moveWindowToDisplay(2))
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '3', moveWindowToDisplay(3))
+
+-- change current background screen
+function changeBackgroundScreen()
+	return function()		
+		local imagesInPath = io.popen([[ls /Users/jayjah/Documents/images]]):lines()
+		local counter = countFiles(imagesInPath)
+		local random = math.random(counter)
+		imagesInPath = io.popen([[ls /Users/jayjah/Documents/images]]):lines()
+		local pathFromRandom = pathFromDir(imagesInPath, random)
+		for key, screen in pairs(hs.screen.allScreens()) do
+			screen:desktopImageURL("file:///Users/jayjah/Documents/images/" .. pathFromRandom)
+		end		
+	end
+end
+
+function pathFromDir(list, random)
+	local counter = 0
+	for dir in list do
+		counter = counter + 1 
+		if (counter == random) then return dir end
+	end
+end
+
+function countFiles(files)
+	local counter = 0
+	for dir in files do 
+		counter = counter + 1 
+	end
+	return counter
+end
+
+hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'C', changeBackgroundScreen())
 
 
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "1", moveWindowToDisplay(1))
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "2", moveWindowToDisplay(2))
-hs.hotkey.bind({"ctrl", "alt", "cmd"}, "3", moveWindowToDisplay(3))
-hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'M', hs.grid.maximizeWindow)
+
+
+
+
+
+
+
+
+
+-- move current active window to next left or right workspace
+local hotkey = require "hs.hotkey"
+local window = require "hs.window"
+local spaces = require "hs.spaces"
+
+function getGoodFocusedWindow(nofull)
+   local win = window.focusedWindow()
+   if not win or not win:isStandard() then return end
+   if nofull and win:isFullScreen() then return end
+   return win
+end 
+
+function flashScreen(screen)
+   local flash=hs.canvas.new(screen:fullFrame()):appendElements({
+	 action = "fill",
+	 fillColor = { alpha = 0.25, red=1},
+	 type = "rectangle"})
+   flash:show()
+   hs.timer.doAfter(.15,function () flash:delete() end)
+end 
+
+function switchSpace(skip,dir)
+   for i=1,skip do
+      hs.eventtap.keyStroke({"ctrl","fn"},dir,0) -- "fn" is a bugfix!
+   end 
+end
+
+function moveWindowOneSpace(dir,switch)
+   local win = getGoodFocusedWindow(true)
+   if not win then return end
+   local screen=win:screen()
+   local uuid=screen:getUUID()
+   local userSpaces=nil
+   for k,v in pairs(spaces.allSpaces()) do
+      userSpaces=v
+      if k==uuid then break end
+   end
+   if not userSpaces then return end
+   local thisSpace=spaces.windowSpaces(win) -- first space win appears on
+   if not thisSpace then return else thisSpace=thisSpace[1] end
+   local last=nil
+   local skipSpaces=0
+   for _, spc in ipairs(userSpaces) do
+      if spaces.spaceType(spc)~="user" then -- skippable space
+	 skipSpaces=skipSpaces+1
+      else
+	 if last and
+	    ((dir=="left" and spc==thisSpace) or
+	     (dir=="right" and last==thisSpace)) then
+	       local newSpace=(dir=="left" and last or spc)
+	       if switch then
+		  -- spaces.gotoSpace(newSpace)  -- also possible, invokes MC
+		  switchSpace(skipSpaces+1,dir)
+	       end
+	       spaces.moveWindowToSpace(win,newSpace)
+	       return
+	 end
+	 last=spc	 -- Haven't found it yet...
+	 skipSpaces=0
+      end
+   end
+   flashScreen(screen)   -- Shouldn't get here, so no space found
+end
+
+hotkey.bind({'ctrl', 'alt'}, "Right",nil,
+	    function() moveWindowOneSpace("right",true) end)
+--hotkey.bind({'ctrl', 'alt', 'cmd'}, "a",nil,
+--	    function() moveWindowOneSpace("left",true) end)
+hotkey.bind({'ctrl', 'alt'}, "Left",nil,
+	    function() moveWindowOneSpace("left",true) end)
+--hotkey.bind(mashshift, "a",nil,
+--	    function() moveWindowOneSpace("left",false) end)
