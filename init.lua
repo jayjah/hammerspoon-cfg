@@ -33,7 +33,8 @@ hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '5', baseMove(0, 0.5, 0.5, 0.5))
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '6', baseMove(0.5, 0.5, 0.5, 0.5))
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'M', hs.grid.maximizeWindow)
 
--- move current active window to differenct display
+
+-- move current active window to different display
 function moveWindowToDisplay(d)
   return function()
     local displays = hs.screen.allScreens()
@@ -46,49 +47,30 @@ hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '1', moveWindowToDisplay(1))
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '2', moveWindowToDisplay(2))
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '3', moveWindowToDisplay(3))
 
--- change current background screen
+
+-- change background image of current active space
 function changeBackgroundScreen()
 	return function()		
-		local imagesInPath = io.popen([[ls /Users/jayjah/Documents/images]]):lines()
-		local counter = countFiles(imagesInPath)
-		local random = math.random(counter)
-		imagesInPath = io.popen([[ls /Users/jayjah/Documents/images]]):lines()
-		local pathFromRandom = pathFromDir(imagesInPath, random)
+		local allImages = {}
+		for line in io.popen([[ls /Users/jayjah/Documents/images]]):lines() do
+				table.insert(allImages, line)
+		end		
+		local nextImageName = valueFromListAtIndex(allImages, math.random(#allImages))
 		for key, screen in pairs(hs.screen.allScreens()) do
-			screen:desktopImageURL("file:///Users/jayjah/Documents/images/" .. pathFromRandom)
+			screen:desktopImageURL("file:///Users/jayjah/Documents/images/" .. nextImageName)
 		end		
 	end
 end
 
-function pathFromDir(list, random)
-	local counter = 0
-	for dir in list do
-		counter = counter + 1 
-		if (counter == random) then return dir end
+function valueFromListAtIndex(list, index)
+	for i, value in ipairs(list) do
+		if (i == index) then return value end
 	end
-end
-
-function countFiles(files)
-	local counter = 0
-	for dir in files do 
-		counter = counter + 1 
-	end
-	return counter
 end
 
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'C', changeBackgroundScreen())
 
-
-
-
-
-
-
-
-
-
-
--- move current active window to next left or right workspace
+-- move current active window to next left or right space
 local hotkey = require "hs.hotkey"
 local window = require "hs.window"
 local spaces = require "hs.spaces"
