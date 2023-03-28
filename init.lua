@@ -36,11 +36,11 @@ hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'M', hs.grid.maximizeWindow)
 
 -- move current active window to different display
 function moveWindowToDisplay(d)
-  return function()
-    local displays = hs.screen.allScreens()
-    local win = hs.window.focusedWindow()
-    win:moveToScreen(displays[d], false, true)
-  end
+    return function()
+        local displays = hs.screen.allScreens()
+        local win = hs.window.focusedWindow()
+        win:moveToScreen(displays[d], false, true)
+    end
 end
 
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '1', moveWindowToDisplay(1))
@@ -50,22 +50,22 @@ hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, '3', moveWindowToDisplay(3))
 
 -- change background image of current active space
 function changeBackgroundScreen()
-	return function()		
-		local allImages = {}
-		for line in io.popen([[ls /Users/jayjah/Documents/images]]):lines() do
-				table.insert(allImages, line)
-		end		
-		local nextImageName = valueFromListAtIndex(allImages, math.random(#allImages))
-		for key, screen in pairs(hs.screen.allScreens()) do
-			screen:desktopImageURL("file:///Users/jayjah/Documents/images/" .. nextImageName)
-		end		
-	end
+    return function()
+        local allImages = {}
+        for line in io.popen([[ls /Users/jayjah/Documents/images]]):lines() do
+            table.insert(allImages, line)
+        end
+        local nextImageName = valueFromListAtIndex(allImages, math.random(#allImages))
+        for _, screen in pairs(hs.screen.allScreens()) do
+            screen:desktopImageURL("file:///Users/jayjah/Documents/images/" .. nextImageName)
+        end
+    end
 end
 
 function valueFromListAtIndex(list, index)
-	for i, value in ipairs(list) do
-		if (i == index) then return value end
-	end
+    for i, value in ipairs(list) do
+        if (i == index) then return value end
+    end
 end
 
 hs.hotkey.bind({'ctrl', 'alt', 'cmd'}, 'C', changeBackgroundScreen())
@@ -76,69 +76,94 @@ local window = require "hs.window"
 local spaces = require "hs.spaces"
 
 function getGoodFocusedWindow(nofull)
-   local win = window.focusedWindow()
-   if not win or not win:isStandard() then return end
-   if nofull and win:isFullScreen() then return end
-   return win
-end 
+    local win = window.focusedWindow()
+    if not win or not win:isStandard() then return end
+    if nofull and win:isFullScreen() then return end
+    return win
+end
 
 function flashScreen(screen)
-   local flash=hs.canvas.new(screen:fullFrame()):appendElements({
-	 action = "fill",
-	 fillColor = { alpha = 0.25, red=1},
-	 type = "rectangle"})
-   flash:show()
-   hs.timer.doAfter(.15,function () flash:delete() end)
-end 
+    local flash=hs.canvas.new(screen:fullFrame()):appendElements({
+        action = "fill",
+        fillColor = { alpha = 0.25, red=1},
+        type = "rectangle"})
+    flash:show()
+    hs.timer.doAfter(.15,function () flash:delete() end)
+end
 
 function switchSpace(skip,dir)
-   for i=1,skip do
-      hs.eventtap.keyStroke({"ctrl","fn"},dir,0) -- "fn" is a bugfix!
-   end 
+    for _ =1,skip do
+        hs.eventtap.keyStroke({"ctrl","fn"},dir,0) -- "fn" is a bugfix!
+    end
 end
 
 function moveWindowOneSpace(dir,switch)
-   local win = getGoodFocusedWindow(true)
-   if not win then return end
-   local screen=win:screen()
-   local uuid=screen:getUUID()
-   local userSpaces=nil
-   for k,v in pairs(spaces.allSpaces()) do
-      userSpaces=v
-      if k==uuid then break end
-   end
-   if not userSpaces then return end
-   local thisSpace=spaces.windowSpaces(win) -- first space win appears on
-   if not thisSpace then return else thisSpace=thisSpace[1] end
-   local last=nil
-   local skipSpaces=0
-   for _, spc in ipairs(userSpaces) do
-      if spaces.spaceType(spc)~="user" then -- skippable space
-	 skipSpaces=skipSpaces+1
-      else
-	 if last and
-	    ((dir=="left" and spc==thisSpace) or
-	     (dir=="right" and last==thisSpace)) then
-	       local newSpace=(dir=="left" and last or spc)
-	       if switch then
-		  -- spaces.gotoSpace(newSpace)  -- also possible, invokes MC
-		  switchSpace(skipSpaces+1,dir)
-	       end
-	       spaces.moveWindowToSpace(win,newSpace)
-	       return
-	 end
-	 last=spc	 -- Haven't found it yet...
-	 skipSpaces=0
-      end
-   end
-   flashScreen(screen)   -- Shouldn't get here, so no space found
+    local win = getGoodFocusedWindow(true)
+    if not win then return end
+    local screen=win:screen()
+    local uuid=screen:getUUID()
+    local userSpaces
+    for k,v in pairs(spaces.allSpaces()) do
+        userSpaces=v
+        if k==uuid then break end
+    end
+    if not userSpaces then return end
+    local thisSpace=spaces.windowSpaces(win) -- first space win appears on
+    if not thisSpace then return else thisSpace=thisSpace[1] end
+    local last=nil
+    local skipSpaces=0
+    for _, spc in ipairs(userSpaces) do
+        if spaces.spaceType(spc)~="user" then -- skippable space
+            skipSpaces=skipSpaces+1
+        else
+            if last and
+                    ((dir=="left" and spc==thisSpace) or
+                            (dir=="right" and last==thisSpace)) then
+                local newSpace=(dir=="left" and last or spc)
+                if switch then
+                    -- spaces.gotoSpace(newSpace)  -- also possible, invokes MC
+                    switchSpace(skipSpaces+1,dir)
+                end
+                spaces.moveWindowToSpace(win,newSpace)
+                return
+            end
+            last=spc	 -- Haven't found it yet...
+            skipSpaces=0
+        end
+    end
+    flashScreen(screen)   -- Shouldn't get here, so no space found
 end
 
 hotkey.bind({'ctrl', 'alt'}, "Right",nil,
-	    function() moveWindowOneSpace("right",true) end)
+        function() moveWindowOneSpace("right",true) end)
 --hotkey.bind({'ctrl', 'alt', 'cmd'}, "a",nil,
 --	    function() moveWindowOneSpace("left",true) end)
 hotkey.bind({'ctrl', 'alt'}, "Left",nil,
-	    function() moveWindowOneSpace("left",true) end)
+        function() moveWindowOneSpace("left",true) end)
 --hotkey.bind(mashshift, "a",nil,
 --	    function() moveWindowOneSpace("left",false) end)
+
+-- Define default Spoons which will be loaded later
+if not hspoon_list then
+    hspoon_list = {
+        "Calendar",
+        "WinWin",
+    }
+end
+
+-- Load those Spoons
+for _, v in pairs(hspoon_list) do
+    hs.loadSpoon(v)
+end
+
+-- resizing window a little part
+local winwin = require "WinWin"
+
+hotkey.bind({'shift', 'alt'}, "Left",nil,
+        function() winwin:stepResize("left") end)
+hotkey.bind({'shift', 'alt'}, "Right",nil,
+        function() winwin:stepResize("right") end)
+hotkey.bind({'shift', 'alt'}, "Up",nil,
+        function() winwin:stepResize("up") end)
+hotkey.bind({'shift', 'alt'}, "Down",nil,
+        function() winwin:stepResize("down") end)
